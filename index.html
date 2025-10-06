@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DonorDex - Political Contribution Research</title>
+    <meta name="description" content="Track and analyze political contributions from FEC data - Gotta track 'em all!">
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#174A57">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#174A57">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#174A57">
+
+    <!-- iOS-specific -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DonorDex">
+    <meta name="format-detection" content="telephone=no">
+
+    <!-- iOS Splash Screens (optional - can be added later) -->
+    <link rel="apple-touch-startup-image" href="icons/icon-512.png">
+
+    <!-- Microsoft Tiles -->
+    <meta name="msapplication-TileColor" content="#174A57">
+    <meta name="msapplication-TileImage" content="icons/icon-144.png">
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- PWA Install Banner -->
+    <div id="installBanner" style="display: none; position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #174A57 0%, #1a5563 100%); color: white; padding: 12px 16px; z-index: 2000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); align-items: center; justify-content: space-between; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+            <svg width="40" height="40" viewBox="0 0 100 100" style="flex-shrink: 0;">
+                <rect x="10" y="10" width="80" height="80" rx="8" fill="#56D2B4" stroke="white" stroke-width="3"/>
+                <path d="M 35 37 L 45 45 L 65 28" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+            <div>
+                <div style="font-weight: 600; font-size: 14px;">Install DonorDex</div>
+                <div style="font-size: 12px; opacity: 0.9;">Install as an app for quick access</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-shrink: 0;">
+            <button onclick="App.installPWA()" style="background: #56D2B4; color: #174A57; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Install</button>
+            <button onclick="App.hideInstallBanner()" style="background: transparent; color: white; border: 2px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Later</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-content">
+                <svg class="pokedex-logo" width="80" height="80" viewBox="0 0 100 100">
+                    <!-- Pokédex body -->
+                    <rect x="10" y="10" width="80" height="80" rx="8" fill="#174A57" stroke="#56D2B4" stroke-width="3"/>
+                    <!-- Screen -->
+                    <rect x="20" y="20" width="60" height="35" rx="3" fill="#56D2B4" opacity="0.3"/>
+                    <!-- Screen inner glow -->
+                    <rect x="23" y="23" width="54" height="29" rx="2" fill="#56D2B4" opacity="0.6"/>
+                    <!-- Checkmark in screen -->
+                    <path d="M 35 37 L 45 45 L 65 28" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+                    <!-- Button row -->
+                    <circle cx="30" cy="70" r="6" fill="#56D2B4"/>
+                    <circle cx="50" cy="70" r="6" fill="#56D2B4" opacity="0.6"/>
+                    <circle cx="70" cy="70" r="6" fill="#56D2B4" opacity="0.3"/>
+                    <!-- Power light -->
+                    <circle cx="85" cy="20" r="4" fill="#56D2B4" opacity="0.8">
+                        <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/>
+                    </circle>
+                </svg>
+                <div class="header-text">
+                    <h1><span class="logo-donor">Donor</span><span class="logo-dex">Dex</span></h1>
+                    <p>Gotta track 'em all!</p>
+                </div>
+            </div>
+        </div>
+        <div style="background: white; padding: 8px 16px; text-align: right; font-size: 12px; color: #174A57; border-bottom: 1px solid #e2e8f0;">
+            <span id="totalDonors">0</span> contributors •
+            <span id="totalRecords">0</span> contributions •
+            <span id="totalCandidates">0</span> committees
+        </div>
+
+        <div class="content">
+            <!-- Search Section - Always Visible -->
+            <div class="main-search">
+                <h2 style="margin-bottom: 15px; font-size: 18px; color: #174A57;">🔎 Search</h2>
+                <div class="search-box">
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Search by donor name..."
+                        autocomplete="off"
+                    >
+                    <span class="search-icon">🔍</span>
+                </div>
+                <div class="results-container" id="resultsContainer">
+                    <div class="no-results">Enter a donor name to begin search</div>
+                </div>
+            </div>
+
+            <!-- Filter Section - Always Visible -->
+            <div class="main-filter">
+                <h2 style="margin-bottom: 15px; font-size: 18px; color: #174A57; cursor: pointer; display: flex; align-items: center; justify-content: space-between;" onclick="Filters.toggleFilters()">
+                    <span>📊 Browse & Filter</span>
+                    <span id="filterToggleIcon" style="font-size: 14px; transition: transform 0.3s;">▶</span>
+                </h2>
+
+                <div id="filterForm" class="form-grid" style="display: none;">
+                    <div class="form-group">
+                        <label for="filterCommittee">Committee</label>
+                        <input type="text" id="filterCommittee" placeholder="Any committee">
+                    </div>
+                    <div class="form-group">
+                        <label for="filterState">State</label>
+                        <input type="text" id="filterState" placeholder="Any state" maxlength="2">
+                    </div>
+                    <div class="form-group">
+                        <label for="filterEmployer">Employer</label>
+                        <input type="text" id="filterEmployer" placeholder="Any employer">
+                    </div>
+                    <div class="form-group">
+                        <label for="filterOccupation">Occupation</label>
+                        <input type="text" id="filterOccupation" placeholder="Any occupation">
+                    </div>
+                    <div class="form-group">
+                        <label for="filterMinAmount">Min Amount ($)</label>
+                        <input type="number" id="filterMinAmount" placeholder="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="filterMaxAmount">Max Amount ($)</label>
+                        <input type="number" id="filterMaxAmount" placeholder="Any" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="filterStartDate">From Date</label>
+                        <input type="date" id="filterStartDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="filterEndDate">To Date</label>
+                        <input type="date" id="filterEndDate">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="sortBy">Sort By</label>
+                    <select id="sortBy" class="mapper-select">
+                        <option value="date-desc">Date (Newest First)</option>
+                        <option value="date-asc">Date (Oldest First)</option>
+                        <option value="amount-desc">Amount (High to Low)</option>
+                        <option value="amount-asc">Amount (Low to High)</option>
+                        <option value="name-asc">Name (A to Z)</option>
+                        <option value="name-desc">Name (Z to A)</option>
+                        <option value="committee-asc">Committee (A to Z)</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="Filters.applyFilters()">Apply Filters</button>
+                    <button class="btn btn-secondary" onclick="Filters.clearFilters()">Clear Filters</button>
+                    <button class="btn btn-secondary" onclick="Filters.exportFiltered()">Export Results</button>
+                </div>
+
+                <div class="filter-summary" style="margin-top: 20px;">
+                    <div class="filter-summary-text">
+                        <strong id="browseCount">0</strong> contributions
+                        <span id="browseTotal" style="color: #718096;"></span>
+                    </div>
+                    <div class="filter-controls">
+                        <span style="color: #718096;">Show:</span>
+                        <select id="pageSize" class="mapper-select" style="padding: 8px 12px; font-size: 14px; width: auto;" onchange="Filters.applyFilters()">
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="results-container" id="browseContainer">
+                    <div class="no-results">Click "Apply Filters" to browse</div>
+                </div>
+
+                <div id="pagination" style="display: none;">
+                    <button class="btn btn-secondary" onclick="Filters.previousPage()" id="prevBtn">← Previous</button>
+                    <div style="font-size: 14px; color: #4a5568;">
+                        Page <strong id="currentPage">1</strong> of <strong id="totalPages">1</strong>
+                    </div>
+                    <button class="btn btn-secondary" onclick="Filters.nextPage()" id="nextBtn">Next →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import/Export Modal -->
+        <div id="importExportModal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 2000; max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <h2 style="margin-bottom: 20px; color: #174A57;">📁 Import/Export</h2>
+
+            <!-- Import Section -->
+            <div style="margin-bottom: 30px;">
+                <h3 style="font-size: 16px; margin-bottom: 15px; color: #174A57;">Import FEC Data</h3>
+                <div style="margin-bottom: 20px;">
+                    <label for="csvFile" style="display: block; margin-bottom: 8px; font-weight: 600;">📁 Upload CSV File</label>
+                    <input type="file" id="csvFile" accept=".csv,.txt" onchange="ImportExport.handleFileUpload(event)">
+                    <div class="help-text" style="margin-top: 8px;">Upload FEC CSV file (shows preview before importing)</div>
+                </div>
+
+                <div style="text-align: center; margin: 20px 0; color: #a0aec0; font-size: 13px; font-weight: 600;">— OR —</div>
+
+                <label for="bulkData">Paste CSV Text</label>
+                <textarea id="bulkData" placeholder="Paste FEC CSV data here..."></textarea>
+                <div class="help-text">Paste FEC data, then click "Process Import" below</div>
+
+                <!-- Import Mode Selection -->
+                <div style="margin: 16px 0;">
+                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Import Mode:</label>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: normal;">
+                            <input type="radio" name="importMode" value="smart" checked style="width: auto;">
+                            <span><strong>Smart merge</strong> - Combine earmarked contributions</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: normal;">
+                            <input type="radio" name="importMode" value="individuals" style="width: auto;">
+                            <span>Individual donors only</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: normal;">
+                            <input type="radio" name="importMode" value="all" style="width: auto;">
+                            <span>Import all records (including refunds)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="ImportExport.smartImport()">Process Import</button>
+                    <button class="btn btn-secondary" onclick="ImportExport.showManualMapper()">Manual Mapping</button>
+                </div>
+
+                <!-- Manual Mapper -->
+                <div id="manualMapper" style="display: none; margin-top: 20px; padding: 20px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px;">
+                    <div style="font-weight: 600; margin-bottom: 15px; color: #174A57; font-size: 16px;">Manual Column Mapping</div>
+                    <div style="font-size: 13px; color: #718096; margin-bottom: 15px;">
+                        Select which column contains each type of data.
+                    </div>
+                    <div id="mapperContent"></div>
+                    <div class="button-group" style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="ImportExport.applyManualMapping()">Apply & Import</button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('manualMapper').style.display='none'">Cancel</button>
+                    </div>
+                </div>
+
+                <!-- Import Preview -->
+                <div id="importPreview" style="display: none; margin-top: 20px; padding: 20px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px;">
+                    <div style="font-weight: 600; margin-bottom: 10px; color: #174A57; font-size: 16px;">Import Preview</div>
+                    <div id="previewContent"></div>
+                    <div class="button-group" style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="ImportExport.confirmImport()">Confirm Import</button>
+                        <button class="btn btn-secondary" onclick="ImportExport.showManualMapper()">Adjust Mapping</button>
+                        <button class="btn btn-secondary" onclick="ImportExport.cancelImport()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Section -->
+            <div style="margin-bottom: 20px; border-top: 2px solid #e2e8f0; padding-top: 20px;">
+                <h3 style="font-size: 16px; margin-bottom: 15px; color: #174A57;">Export Data</h3>
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="ImportExport.exportData()">📥 Export All Records</button>
+                    <button class="btn btn-secondary" onclick="Filters.exportFiltered()">📥 Export Filtered</button>
+                </div>
+            </div>
+
+            <div class="button-group" style="margin-top: 20px; border-top: 2px solid #e2e8f0; padding-top: 20px;">
+                <button class="btn btn-secondary" onclick="UI.closeImportExportModal()">Close</button>
+            </div>
+        </div>
+
+        <!-- Add Contribution Modal -->
+        <div id="addModal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 2000; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <h2 style="margin-bottom: 20px; color: #174A57;">➕ Add Contribution</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="modalFirstName">First Name *</label>
+                    <input type="text" id="modalFirstName" placeholder="John" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalLastName">Last Name *</label>
+                    <input type="text" id="modalLastName" placeholder="Smith" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalCandidateName">Committee *</label>
+                    <input type="text" id="modalCandidateName" placeholder="Campaign Committee" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalContributionDate">Date *</label>
+                    <input type="date" id="modalContributionDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalTotalAmount">Amount *</label>
+                    <input type="number" id="modalTotalAmount" placeholder="2500" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalEmployer">Employer</label>
+                    <input type="text" id="modalEmployer" placeholder="Acme Corp">
+                </div>
+                <div class="form-group">
+                    <label for="modalOccupation">Occupation</label>
+                    <input type="text" id="modalOccupation" placeholder="Engineer">
+                </div>
+                <div class="form-group">
+                    <label for="modalCity">City</label>
+                    <input type="text" id="modalCity" placeholder="Chicago">
+                </div>
+                <div class="form-group">
+                    <label for="modalState">State</label>
+                    <input type="text" id="modalState" placeholder="IL" maxlength="2">
+                </div>
+            </div>
+            <div class="button-group" style="margin-top: 20px;">
+                <button class="btn btn-primary" onclick="UI.addDonorFromModal()">Add Contribution</button>
+                <button class="btn btn-secondary" onclick="UI.clearModalForm()">Clear</button>
+                <button class="btn btn-secondary" onclick="UI.closeAddModal()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Modal Backdrop -->
+        <div id="modalBackdrop" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1999;" onclick="UI.closeAllModals()"></div>
+
+        <!-- FAB Menu -->
+        <div id="fabMenu" style="display: none; position: fixed; bottom: 100px; right: 30px; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 1001; min-width: 200px;">
+            <div style="padding: 8px 0;">
+                <div onclick="UI.openAddModal(); UI.closeFabMenu();" style="padding: 12px 20px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
+                    <span style="font-size: 18px;">➕</span>
+                    <span style="font-weight: 600; color: #174A57;">Add Contribution</span>
+                </div>
+                <div onclick="UI.openImportExportModal(); UI.closeFabMenu();" style="padding: 12px 20px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
+                    <span style="font-size: 18px;">📁</span>
+                    <span style="font-weight: 600; color: #174A57;">Import/Export</span>
+                </div>
+                <div onclick="App.clearAllData(); UI.closeFabMenu();" style="padding: 12px 20px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
+                    <span style="font-size: 18px;">🗑️</span>
+                    <span style="font-weight: 600; color: #dc2626;">Clear All</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Action Button -->
+        <div class="fab" onclick="UI.toggleFabMenu()" title="Actions">☰</div>
+    </div>
+
+    <!-- Scripts: Load in dependency order -->
+    <script src="lib/dexie.min.js"></script>
+    <script src="js/database.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/search.js"></script>
+    <script src="js/filters.js"></script>
+    <script src="js/import-export.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
