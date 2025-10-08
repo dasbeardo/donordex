@@ -11,6 +11,11 @@ db.version(1).stores({
     contributions: '&id, lastName, candidateName, contributionDate, contributionEpoch, amount, state, employer, occupation, entityType'
 });
 
+// Schema v2: Add importHash for deduplication
+db.version(2).stores({
+    contributions: '&id, lastName, candidateName, contributionDate, contributionEpoch, amount, state, employer, occupation, entityType, importHash'
+});
+
 /**
  * Database operations
  */
@@ -167,6 +172,30 @@ const Database = {
             uniqueContributors: uniqueContributors.size,
             uniqueCommittees: uniqueCommittees.size
         };
+    },
+
+    /**
+     * Check if an import hash already exists (for deduplication)
+     * @param {string} hash - SHA-256 hash to check
+     * @returns {Promise<boolean>} - True if hash exists
+     */
+    async hashExists(hash) {
+        if (!hash) return false;
+        const record = await db.contributions.where('importHash').equals(hash).first();
+        return !!record;
+    },
+
+    /**
+     * Get all existing import hashes (for bulk deduplication check)
+     * @returns {Promise<Set>} - Set of all import hashes
+     */
+    async getExistingHashes() {
+        const records = await db.contributions.toArray();
+        const hashes = new Set();
+        records.forEach(r => {
+            if (r.importHash) hashes.add(r.importHash);
+        });
+        return hashes;
     }
 };
 

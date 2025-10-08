@@ -262,6 +262,20 @@ const Utils = {
         const distance = this.levenshteinDistance(str1, str2);
         const maxLength = Math.max(str1.length, str2.length);
         return 1 - (distance / maxLength);
+    },
+
+    /**
+     * Generate SHA-256 hash of a string (for deduplication)
+     * @param {string} str - String to hash
+     * @returns {Promise<string>} - Hex-encoded SHA-256 hash
+     */
+    async sha256(str) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(str);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
     }
 };
 

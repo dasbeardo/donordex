@@ -11,18 +11,22 @@ const ImportExport = {
 
     // Column detection patterns for FEC CSV formats
     COLUMN_PATTERNS: {
-        firstName: ['contributor_first_name', 'first_name', 'firstname', 'first', 'contrib_first_name'],
-        lastName: ['contributor_last_name', 'last_name', 'lastname', 'last', 'contrib_last_name'],
+        // ActBlue-specific columns
+        firstName: ['donor first name', 'contributor_first_name', 'first_name', 'firstname', 'first', 'contrib_first_name'],
+        lastName: ['donor last name', 'contributor_last_name', 'last_name', 'lastname', 'last', 'contrib_last_name'],
         fullName: ['contributor_name', 'donor_name', 'name', 'individual_name', 'person_name', 'contributor', 'donor'],
-        committee: ['committee_name', 'recipient_name', 'committee', 'candidate_name', 'recipient', 'payee_name', 'committee_id', 'cmte_id'],
-        date: ['contribution_receipt_date', 'transaction_date', 'receipt_date', 'date', 'transaction_dt', 'contrib_date'],
-        amount: ['contribution_receipt_amount', 'transaction_amount', 'amount', 'receipt_amount', 'total', 'transaction_amt', 'contrib_amount'],
+        committee: ['recipient', 'committee_name', 'recipient_name', 'committee', 'candidate_name', 'payee_name', 'committee_id', 'cmte_id'],
+        date: ['date', 'contribution_receipt_date', 'transaction_date', 'receipt_date', 'transaction_dt', 'contrib_date'],
+        amount: ['amount', 'contribution_receipt_amount', 'transaction_amount', 'receipt_amount', 'total', 'transaction_amt', 'contrib_amount'],
         entity: ['entity_type', 'entity_tp', 'entity_t', 'entity'],
         tranId: ['transaction_id', 'tran_id', 'sub_id', 'transaction_number'],
-        employer: ['contributor_employer', 'employer', 'contrib_employer'],
-        occupation: ['contributor_occupation', 'occupation', 'contrib_occupation'],
-        city: ['contributor_city', 'city', 'contrib_city'],
-        state: ['contributor_state', 'state', 'contrib_state', 'contributor_st']
+        employer: ['donor employer', 'contributor_employer', 'employer', 'contrib_employer'],
+        occupation: ['donor occupation', 'contributor_occupation', 'occupation', 'contrib_occupation'],
+        city: ['donor city', 'contributor_city', 'city', 'contrib_city'],
+        state: ['donor state', 'contributor_state', 'state', 'contrib_state', 'contributor_st'],
+        // ActBlue Receipt ID for deduplication
+        receiptId: ['receipt id', 'receipt_id', 'receiptid'],
+        recurrenceNumber: ['recurrence number', 'recurrence_number', 'recurrencenumber']
     },
 
     /**
@@ -82,7 +86,7 @@ const ImportExport = {
     /**
      * Smart import with auto-detection and preview
      */
-    smartImport() {
+    async smartImport() {
         const bulkData = document.getElementById('bulkData').value.trim();
         if (!bulkData) {
             alert('Please enter data to import');
@@ -122,6 +126,8 @@ const ImportExport = {
         stateCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.state);
         entityTypeCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.entity);
         transactionIdCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.tranId);
+        const receiptIdCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.receiptId);
+        const recurrenceNumberCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.recurrenceNumber);
 
         // Validate that we have either first/last OR full name
         const hasNameData = (firstNameCol !== -1 && lastNameCol !== -1) || fullNameCol !== -1;
@@ -207,6 +213,8 @@ const ImportExport = {
             const occupation = occupationCol !== -1 ? (fields[occupationCol] || '').trim() : '';
             const city = cityCol !== -1 ? (fields[cityCol] || '').trim() : '';
             const state = stateCol !== -1 ? (fields[stateCol] || '').trim().toUpperCase() : '';
+            const receiptId = receiptIdCol !== -1 ? (fields[receiptIdCol] || '').trim() : '';
+            const recurrenceNumber = recurrenceNumberCol !== -1 ? (fields[recurrenceNumberCol] || '').trim() : '';
 
             allRecords.push({
                 firstName,
@@ -221,7 +229,9 @@ const ImportExport = {
                 employer,
                 occupation,
                 city,
-                state
+                state,
+                receiptId,  // Store temporarily for hashing
+                recurrenceNumber  // Store temporarily for hashing
             });
         });
 
@@ -273,6 +283,54 @@ const ImportExport = {
         } else {
             // Import all records
             parsedData = allRecords;
+        }
+
+        // Hash Receipt IDs and check for duplicates (ActBlue deduplication)
+        const hasReceiptIds = parsedData.some(r => r.receiptId);
+        let duplicateCount = 0;
+
+        if (hasReceiptIds) {
+            // Get existing hashes from database
+            const existingHashes = await Database.getExistingHashes();
+            const dedupedData = [];
+
+            for (const record of parsedData) {
+                if (record.receiptId) {
+                    // Hash the Receipt ID + Recurrence Number for unique identification
+                    const hashInput = record.receiptId + '|' + (record.recurrenceNumber || '1');
+                    const hash = await Utils.sha256(hashInput);
+
+                    // Check if hash already exists
+                    if (existingHashes.has(hash)) {
+                        duplicateCount++;
+                        continue; // Skip this duplicate
+                    }
+
+                    // Add to deduped data with hash
+                    record.importHash = hash;
+                    delete record.receiptId; // Remove raw receipt ID for security
+                    delete record.recurrenceNumber; // Remove recurrence number
+                    dedupedData.push(record);
+                    existingHashes.add(hash); // Track for this import session
+                } else {
+                    // No receipt ID, just include the record
+                    delete record.receiptId;
+                    delete record.recurrenceNumber;
+                    dedupedData.push(record);
+                }
+            }
+
+            parsedData = dedupedData;
+
+            if (duplicateCount > 0) {
+                errors.push(`Skipped ${duplicateCount} duplicate record${duplicateCount > 1 ? 's' : ''} (already imported)`);
+            }
+        } else {
+            // No receipt IDs found, remove the field from all records
+            parsedData.forEach(r => {
+                delete r.receiptId;
+                delete r.recurrenceNumber;
+            });
         }
 
         this.pendingImportData = parsedData;
