@@ -12,6 +12,9 @@ const App = {
      */
     async initialize() {
         try {
+            // Initialize dark mode FIRST (before any rendering)
+            DarkMode.initialize();
+
             // Initialize Dexie database
             await db.open();
             console.log('Database initialized successfully');

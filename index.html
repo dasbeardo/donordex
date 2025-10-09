@@ -21,7 +21,7 @@
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#174A57">
 
     <!-- iOS-specific -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DonorDex">
     <meta name="format-detection" content="telephone=no">
@@ -53,6 +53,11 @@
             <button onclick="App.hideInstallBanner()" style="background: transparent; color: white; border: 2px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Later</button>
         </div>
     </div>
+
+    <!-- Dark Mode Toggle -->
+    <button id="darkModeToggle" class="dark-mode-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+        <span id="darkModeIcon">🌙</span>
+    </button>
 
     <div class="container">
         <div class="header">
@@ -359,6 +364,7 @@
     <script src="js/filters.js"></script>
     <script src="js/import-export.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/dark-mode.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
