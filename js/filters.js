@@ -194,11 +194,11 @@ const Filters = {
 
         // UTF-8 BOM for Excel compatibility
         let csv = '\uFEFF';
-        // Use FEC-style headers for seamless re-import
-        csv += 'contributor_first_name,contributor_last_name,committee_name,contribution_receipt_date,contribution_receipt_amount,contributor_employer,contributor_occupation,contributor_city,contributor_state\n';
+        // Use FEC-style headers for seamless re-import (include importHash for deduplication)
+        csv += 'contributor_first_name,contributor_last_name,committee_name,contribution_receipt_date,contribution_receipt_amount,contributor_employer,contributor_occupation,contributor_city,contributor_state,import_hash\n';
 
         this.filteredRecords.forEach(record => {
-            csv += `${Utils.escapeCsvField(record.firstName)},${Utils.escapeCsvField(record.lastName)},${Utils.escapeCsvField(record.candidateName)},${Utils.escapeCsvField(record.contributionDate)},${Utils.escapeCsvField(record.amount)},${Utils.escapeCsvField(record.employer)},${Utils.escapeCsvField(record.occupation)},${Utils.escapeCsvField(record.city)},${Utils.escapeCsvField(record.state)}\n`;
+            csv += `${Utils.escapeCsvField(record.firstName)},${Utils.escapeCsvField(record.lastName)},${Utils.escapeCsvField(record.candidateName)},${Utils.escapeCsvField(record.contributionDate)},${Utils.escapeCsvField(record.amount)},${Utils.escapeCsvField(record.employer)},${Utils.escapeCsvField(record.occupation)},${Utils.escapeCsvField(record.city)},${Utils.escapeCsvField(record.state)},${Utils.escapeCsvField(record.importHash || '')}\n`;
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

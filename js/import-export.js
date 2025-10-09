@@ -26,7 +26,9 @@ const ImportExport = {
         state: ['donor state', 'contributor_state', 'state', 'contrib_state', 'contributor_st'],
         // ActBlue Receipt ID for deduplication
         receiptId: ['receipt id', 'receipt_id', 'receiptid'],
-        recurrenceNumber: ['recurrence number', 'recurrence_number', 'recurrencenumber']
+        recurrenceNumber: ['recurrence number', 'recurrence_number', 'recurrencenumber'],
+        // DonorDex export hash for deduplication
+        importHash: ['import_hash', 'import hash', 'importhash', 'dedup_hash']
     },
 
     /**
@@ -128,6 +130,7 @@ const ImportExport = {
         transactionIdCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.tranId);
         const receiptIdCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.receiptId);
         const recurrenceNumberCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.recurrenceNumber);
+        const importHashCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.importHash);
 
         // Validate that we have either first/last OR full name
         const hasNameData = (firstNameCol !== -1 && lastNameCol !== -1) || fullNameCol !== -1;
@@ -215,6 +218,7 @@ const ImportExport = {
             const state = stateCol !== -1 ? (fields[stateCol] || '').trim().toUpperCase() : '';
             const receiptId = receiptIdCol !== -1 ? (fields[receiptIdCol] || '').trim() : '';
             const recurrenceNumber = recurrenceNumberCol !== -1 ? (fields[recurrenceNumberCol] || '').trim() : '';
+            const importHash = importHashCol !== -1 ? (fields[importHashCol] || '').trim() : '';
 
             allRecords.push({
                 firstName,
@@ -231,7 +235,8 @@ const ImportExport = {
                 city,
                 state,
                 receiptId,  // Store temporarily for hashing
-                recurrenceNumber  // Store temporarily for hashing
+                recurrenceNumber,  // Store temporarily for hashing
+                importHash  // Preserve existing hash if re-importing DonorDex export
             });
         });
 
@@ -285,39 +290,41 @@ const ImportExport = {
             parsedData = allRecords;
         }
 
-        // Hash Receipt IDs and check for duplicates (ActBlue deduplication)
+        // Deduplication: Handle both ActBlue (receiptId) and DonorDex exports (importHash)
         const hasReceiptIds = parsedData.some(r => r.receiptId);
+        const hasImportHashes = parsedData.some(r => r.importHash);
         let duplicateCount = 0;
 
-        if (hasReceiptIds) {
+        if (hasReceiptIds || hasImportHashes) {
             // Get existing hashes from database
             const existingHashes = await Database.getExistingHashes();
             const dedupedData = [];
 
             for (const record of parsedData) {
-                if (record.receiptId) {
-                    // Hash the Receipt ID + Recurrence Number for unique identification
+                let hash = null;
+
+                if (record.importHash) {
+                    // DonorDex export: use existing hash directly
+                    hash = record.importHash;
+                } else if (record.receiptId) {
+                    // ActBlue export: generate hash from Receipt ID + Recurrence Number
                     const hashInput = record.receiptId + '|' + (record.recurrenceNumber || '1');
-                    const hash = await Utils.sha256(hashInput);
-
-                    // Check if hash already exists
-                    if (existingHashes.has(hash)) {
-                        duplicateCount++;
-                        continue; // Skip this duplicate
-                    }
-
-                    // Add to deduped data with hash
+                    hash = await Utils.sha256(hashInput);
                     record.importHash = hash;
-                    delete record.receiptId; // Remove raw receipt ID for security
-                    delete record.recurrenceNumber; // Remove recurrence number
-                    dedupedData.push(record);
-                    existingHashes.add(hash); // Track for this import session
-                } else {
-                    // No receipt ID, just include the record
-                    delete record.receiptId;
-                    delete record.recurrenceNumber;
-                    dedupedData.push(record);
                 }
+
+                // Check if hash already exists
+                if (hash && existingHashes.has(hash)) {
+                    duplicateCount++;
+                    continue; // Skip this duplicate
+                }
+
+                // Clean up temporary fields
+                delete record.receiptId;
+                delete record.recurrenceNumber;
+
+                dedupedData.push(record);
+                if (hash) existingHashes.add(hash); // Track for this import session
             }
 
             parsedData = dedupedData;
@@ -326,7 +333,7 @@ const ImportExport = {
                 errors.push(`Skipped ${duplicateCount} duplicate record${duplicateCount > 1 ? 's' : ''} (already imported)`);
             }
         } else {
-            // No receipt IDs found, remove the field from all records
+            // No deduplication fields, just clean up
             parsedData.forEach(r => {
                 delete r.receiptId;
                 delete r.recurrenceNumber;
@@ -496,11 +503,11 @@ const ImportExport = {
 
         // UTF-8 BOM for Excel compatibility
         let csv = '\uFEFF';
-        // Use FEC-style headers for seamless re-import
-        csv += 'contributor_first_name,contributor_last_name,committee_name,contribution_receipt_date,contribution_receipt_amount,contributor_employer,contributor_occupation,contributor_city,contributor_state\n';
+        // Use FEC-style headers for seamless re-import (include importHash for deduplication)
+        csv += 'contributor_first_name,contributor_last_name,committee_name,contribution_receipt_date,contribution_receipt_amount,contributor_employer,contributor_occupation,contributor_city,contributor_state,import_hash\n';
 
         records.forEach(record => {
-            csv += `${Utils.escapeCsvField(record.firstName)},${Utils.escapeCsvField(record.lastName)},${Utils.escapeCsvField(record.candidateName)},${Utils.escapeCsvField(record.contributionDate)},${Utils.escapeCsvField(record.amount)},${Utils.escapeCsvField(record.employer)},${Utils.escapeCsvField(record.occupation)},${Utils.escapeCsvField(record.city)},${Utils.escapeCsvField(record.state)}\n`;
+            csv += `${Utils.escapeCsvField(record.firstName)},${Utils.escapeCsvField(record.lastName)},${Utils.escapeCsvField(record.candidateName)},${Utils.escapeCsvField(record.contributionDate)},${Utils.escapeCsvField(record.amount)},${Utils.escapeCsvField(record.employer)},${Utils.escapeCsvField(record.occupation)},${Utils.escapeCsvField(record.city)},${Utils.escapeCsvField(record.state)},${Utils.escapeCsvField(record.importHash || '')}\n`;
         });
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
