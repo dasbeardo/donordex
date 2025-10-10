@@ -307,7 +307,7 @@ const ImportExport = {
             parsedData = allRecords;
         }
 
-        // Deduplication: Handle ActBlue (receiptId), FEC (subId), and DonorDex exports (importHash)
+        // Deduplication: Handle ActBlue (receiptId), FEC (subId), DonorDex exports (importHash), or fallback
         const hasReceiptIds = parsedData.some(r => r.receiptId);
         const hasSubIds = parsedData.some(r => r.subId);
         const hasImportHashes = parsedData.some(r => r.importHash);
@@ -317,71 +317,77 @@ const ImportExport = {
             hasReceiptIds,
             hasSubIds,
             hasImportHashes,
-            totalRecords: parsedData.length
+            totalRecords: parsedData.length,
+            note: 'Will use fallback hash if no unique IDs found'
         });
 
-        if (hasReceiptIds || hasSubIds || hasImportHashes) {
-            // Get existing hashes from database
-            const existingHashes = await Database.getExistingHashes();
-            console.log(`Found ${existingHashes.size} existing hashes in database`);
+        // Always run deduplication (uses fallback hash if no unique IDs)
+        const existingHashes = await Database.getExistingHashes();
+        console.log(`Found ${existingHashes.size} existing hashes in database`);
 
-            const dedupedData = [];
+        const dedupedData = [];
 
-            for (const record of parsedData) {
-                let hash = null;
-                let hashSource = null;
+        for (const record of parsedData) {
+            let hash = null;
+            let hashSource = null;
 
-                if (record.importHash) {
-                    // DonorDex export: use existing hash directly
-                    hash = record.importHash;
-                    hashSource = 'importHash';
-                } else if (record.receiptId) {
-                    // ActBlue export: generate hash from Receipt ID + Recurrence Number
-                    const hashInput = record.receiptId + '|' + (record.recurrenceNumber || '1');
-                    hash = await Utils.sha256(hashInput);
-                    record.importHash = hash;
-                    hashSource = 'actblue';
-                } else if (record.subId) {
-                    // FEC export: generate hash from sub_id
-                    hash = await Utils.sha256(record.subId);
-                    record.importHash = hash;
-                    hashSource = 'fec';
-                }
-
-                // Check if hash already exists
-                if (hash && existingHashes.has(hash)) {
-                    duplicateCount++;
-                    console.log(`Duplicate found (${hashSource}):`, {
-                        name: `${record.firstName} ${record.lastName}`,
-                        hash: hash.substring(0, 16) + '...'
-                    });
-                    continue; // Skip this duplicate
-                }
-
-                // Clean up temporary fields
-                delete record.receiptId;
-                delete record.recurrenceNumber;
-                delete record.subId;
-
-                dedupedData.push(record);
-                if (hash) existingHashes.add(hash); // Track for this import session
+            if (record.importHash) {
+                // DonorDex export: use existing hash directly
+                hash = record.importHash;
+                hashSource = 'importHash';
+            } else if (record.receiptId) {
+                // ActBlue export: generate hash from Receipt ID + Recurrence Number
+                const hashInput = record.receiptId + '|' + (record.recurrenceNumber || '1');
+                hash = await Utils.sha256(hashInput);
+                record.importHash = hash;
+                hashSource = 'actblue';
+            } else if (record.subId) {
+                // FEC export: generate hash from sub_id
+                hash = await Utils.sha256(record.subId);
+                record.importHash = hash;
+                hashSource = 'fec';
+            } else {
+                // Fallback: No unique ID found, hash based on contribution data
+                // This prevents duplicates when CSV lacks unique identifiers
+                const hashInput = [
+                    record.firstName,
+                    record.lastName,
+                    record.candidateName,
+                    record.contributionDate,
+                    record.amount,
+                    record.employer || '',
+                    record.occupation || ''
+                ].join('|');
+                hash = await Utils.sha256(hashInput);
+                record.importHash = hash;
+                hashSource = 'fallback';
             }
 
-            parsedData = dedupedData;
-
-            console.log(`Deduplication complete: ${duplicateCount} duplicates removed, ${parsedData.length} records remaining`);
-
-            if (duplicateCount > 0) {
-                errors.push(`✓ Skipped ${duplicateCount} duplicate record${duplicateCount > 1 ? 's' : ''} (already imported)`);
+            // Check if hash already exists
+            if (hash && existingHashes.has(hash)) {
+                duplicateCount++;
+                console.log(`Duplicate found (${hashSource}):`, {
+                    name: `${record.firstName} ${record.lastName}`,
+                    hash: hash.substring(0, 16) + '...'
+                });
+                continue; // Skip this duplicate
             }
-        } else {
-            console.log('No deduplication fields found in import data');
-            // No deduplication fields, just clean up
-            parsedData.forEach(r => {
-                delete r.receiptId;
-                delete r.recurrenceNumber;
-                delete r.subId;
-            });
+
+            // Clean up temporary fields
+            delete record.receiptId;
+            delete record.recurrenceNumber;
+            delete record.subId;
+
+            dedupedData.push(record);
+            if (hash) existingHashes.add(hash); // Track for this import session
+        }
+
+        parsedData = dedupedData;
+
+        console.log(`Deduplication complete: ${duplicateCount} duplicates removed, ${parsedData.length} records remaining`);
+
+        if (duplicateCount > 0) {
+            errors.push(`✓ Skipped ${duplicateCount} duplicate record${duplicateCount > 1 ? 's' : ''} (already imported)`);
         }
 
         this.pendingImportData = parsedData;
