@@ -21,7 +21,7 @@ const ImportExport = {
         date: ['contribution_receipt_date', 'transaction_date', 'receipt_date', 'transaction_dt', 'contrib_date', 'date'],
         amount: ['contribution_receipt_amount', 'transaction_amount', 'receipt_amount', 'transaction_amt', 'contrib_amount', 'amount', 'total'],
         entity: ['entity_type', 'entity_tp', 'entity_t', 'entity'],
-        tranId: ['transaction_id', 'tran_id', 'sub_id', 'transaction_number'],
+        tranId: ['transaction_id', 'tran_id', 'transaction_number'],
         employer: ['contributor_employer', 'donor employer', 'employer', 'contrib_employer'],
         occupation: ['contributor_occupation', 'donor occupation', 'occupation', 'contrib_occupation'],
         city: ['contributor_city', 'donor city', 'city', 'contrib_city'],
