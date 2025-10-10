@@ -1,13 +1,21 @@
 /**
  * DonorDex Dark Mode Module
  * Automatically follows system dark mode preference
+ *
+ * CURRENTLY DISABLED - Code preserved for future implementation
  */
 
 const DarkMode = {
     /**
      * Initialize dark mode based on system preference
+     * DISABLED: Currently does nothing
      */
     initialize() {
+        // Dark mode disabled - keeping code for future use
+        console.log('[Dark Mode] Currently disabled');
+
+        /* DISABLED CODE - Uncomment to re-enable:
+
         // Check system preference
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -24,6 +32,8 @@ const DarkMode = {
                 document.body.classList.remove('dark-mode');
             }
         });
+
+        */
     },
 
     /**
