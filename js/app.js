@@ -47,18 +47,37 @@ const App = {
                 const registration = await navigator.serviceWorker.register('/sw.js');
                 console.log('Service Worker registered:', registration.scope);
 
-                // Check for updates
+                // Check for updates immediately on load
+                registration.update().catch(err => {
+                    console.log('Update check failed (might be offline):', err);
+                });
+
+                // Check for updates every 60 seconds while app is open
+                setInterval(() => {
+                    registration.update().catch(err => {
+                        console.log('Periodic update check failed:', err);
+                    });
+                }, 60000);
+
+                // Listen for updates
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
-                    console.log('Service Worker update found');
+                    console.log('Service Worker update found!');
 
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // New service worker available, show update prompt
+                            // New service worker available, show update prompt immediately
+                            console.log('New Service Worker installed, prompting user to update');
                             this.showUpdatePrompt();
                         }
                     });
                 });
+
+                // Also check if there's a waiting service worker on load
+                if (registration.waiting) {
+                    console.log('Service Worker update already waiting, prompting user');
+                    this.showUpdatePrompt();
+                }
             } catch (error) {
                 console.error('Service Worker registration failed:', error);
             }
@@ -131,9 +150,65 @@ const App = {
      * Show update prompt for new service worker
      */
     showUpdatePrompt() {
-        if (confirm('A new version of DonorDex is available. Reload to update?')) {
-            window.location.reload();
+        const message = 'A new version of DonorDex is available with important updates!\n\n' +
+                       'Click OK to reload and get the latest version.\n\n' +
+                       '(Your data is safe and will not be lost)';
+
+        if (confirm(message)) {
+            // Tell the waiting service worker to skip waiting and activate immediately
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+            }
+            // Reload after a brief delay to let the service worker activate
+            setTimeout(() => {
+                window.location.reload();
+            }, 100);
+        } else {
+            // If user declines, show a banner so they can update later
+            this.showUpdateBanner();
         }
+    },
+
+    /**
+     * Show persistent update banner (if user declined the prompt)
+     */
+    showUpdateBanner() {
+        // Check if banner already exists
+        if (document.getElementById('updateBanner')) return;
+
+        const banner = document.createElement('div');
+        banner.id = 'updateBanner';
+        banner.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #174A57 0%, #2a6f7e 100%);
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            z-index: 10000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        `;
+        banner.innerHTML = `
+            <span>📱 Update available!</span>
+            <button onclick="App.showUpdatePrompt()" style="
+                background: #56D2B4;
+                color: #174A57;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-weight: 600;
+                cursor: pointer;
+                font-size: 13px;
+            ">Update Now</button>
+        `;
+        document.body.prepend(banner);
     },
 
     /**

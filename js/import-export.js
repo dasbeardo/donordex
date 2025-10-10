@@ -313,31 +313,48 @@ const ImportExport = {
         const hasImportHashes = parsedData.some(r => r.importHash);
         let duplicateCount = 0;
 
+        console.log('Deduplication detection:', {
+            hasReceiptIds,
+            hasSubIds,
+            hasImportHashes,
+            totalRecords: parsedData.length
+        });
+
         if (hasReceiptIds || hasSubIds || hasImportHashes) {
             // Get existing hashes from database
             const existingHashes = await Database.getExistingHashes();
+            console.log(`Found ${existingHashes.size} existing hashes in database`);
+
             const dedupedData = [];
 
             for (const record of parsedData) {
                 let hash = null;
+                let hashSource = null;
 
                 if (record.importHash) {
                     // DonorDex export: use existing hash directly
                     hash = record.importHash;
+                    hashSource = 'importHash';
                 } else if (record.receiptId) {
                     // ActBlue export: generate hash from Receipt ID + Recurrence Number
                     const hashInput = record.receiptId + '|' + (record.recurrenceNumber || '1');
                     hash = await Utils.sha256(hashInput);
                     record.importHash = hash;
+                    hashSource = 'actblue';
                 } else if (record.subId) {
                     // FEC export: generate hash from sub_id
                     hash = await Utils.sha256(record.subId);
                     record.importHash = hash;
+                    hashSource = 'fec';
                 }
 
                 // Check if hash already exists
                 if (hash && existingHashes.has(hash)) {
                     duplicateCount++;
+                    console.log(`Duplicate found (${hashSource}):`, {
+                        name: `${record.firstName} ${record.lastName}`,
+                        hash: hash.substring(0, 16) + '...'
+                    });
                     continue; // Skip this duplicate
                 }
 
@@ -352,10 +369,13 @@ const ImportExport = {
 
             parsedData = dedupedData;
 
+            console.log(`Deduplication complete: ${duplicateCount} duplicates removed, ${parsedData.length} records remaining`);
+
             if (duplicateCount > 0) {
-                errors.push(`Skipped ${duplicateCount} duplicate record${duplicateCount > 1 ? 's' : ''} (already imported)`);
+                errors.push(`✓ Skipped ${duplicateCount} duplicate record${duplicateCount > 1 ? 's' : ''} (already imported)`);
             }
         } else {
+            console.log('No deduplication fields found in import data');
             // No deduplication fields, just clean up
             parsedData.forEach(r => {
                 delete r.receiptId;
