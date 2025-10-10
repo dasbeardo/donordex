@@ -295,7 +295,12 @@ const ImportExport = {
                         employer: individualRecord.employer,
                         occupation: individualRecord.occupation,
                         city: individualRecord.city,
-                        state: individualRecord.state
+                        state: individualRecord.state,
+                        // Preserve deduplication fields from individual record
+                        receiptId: individualRecord.receiptId,
+                        recurrenceNumber: individualRecord.recurrenceNumber,
+                        subId: individualRecord.subId,
+                        importHash: individualRecord.importHash
                     });
                 } else if (group.length === 1) {
                     parsedData.push(group[0]);
