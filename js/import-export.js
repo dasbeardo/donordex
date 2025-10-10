@@ -29,6 +29,8 @@ const ImportExport = {
         // ActBlue Receipt ID for deduplication
         receiptId: ['receipt id', 'receipt_id', 'receiptid'],
         recurrenceNumber: ['recurrence number', 'recurrence_number', 'recurrencenumber'],
+        // FEC sub_id for deduplication
+        subId: ['sub_id', 'subid', 'subscription_id'],
         // DonorDex export hash for deduplication
         importHash: ['import_hash', 'import hash', 'importhash', 'dedup_hash']
     },
@@ -142,6 +144,7 @@ const ImportExport = {
         transactionIdCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.tranId);
         const receiptIdCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.receiptId);
         const recurrenceNumberCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.recurrenceNumber);
+        const subIdCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.subId);
         const importHashCol = this.findColumnIdx(headers, this.COLUMN_PATTERNS.importHash);
 
         // Validate that we have either first/last OR full name
@@ -230,6 +233,7 @@ const ImportExport = {
             const state = stateCol !== -1 ? (fields[stateCol] || '').trim().toUpperCase() : '';
             const receiptId = receiptIdCol !== -1 ? (fields[receiptIdCol] || '').trim() : '';
             const recurrenceNumber = recurrenceNumberCol !== -1 ? (fields[recurrenceNumberCol] || '').trim() : '';
+            const subId = subIdCol !== -1 ? (fields[subIdCol] || '').trim() : '';
             const importHash = importHashCol !== -1 ? (fields[importHashCol] || '').trim() : '';
 
             allRecords.push({
@@ -246,8 +250,9 @@ const ImportExport = {
                 occupation,
                 city,
                 state,
-                receiptId,  // Store temporarily for hashing
-                recurrenceNumber,  // Store temporarily for hashing
+                receiptId,  // Store temporarily for hashing (ActBlue)
+                recurrenceNumber,  // Store temporarily for hashing (ActBlue)
+                subId,  // Store temporarily for hashing (FEC)
                 importHash  // Preserve existing hash if re-importing DonorDex export
             });
         });
@@ -302,12 +307,13 @@ const ImportExport = {
             parsedData = allRecords;
         }
 
-        // Deduplication: Handle both ActBlue (receiptId) and DonorDex exports (importHash)
+        // Deduplication: Handle ActBlue (receiptId), FEC (subId), and DonorDex exports (importHash)
         const hasReceiptIds = parsedData.some(r => r.receiptId);
+        const hasSubIds = parsedData.some(r => r.subId);
         const hasImportHashes = parsedData.some(r => r.importHash);
         let duplicateCount = 0;
 
-        if (hasReceiptIds || hasImportHashes) {
+        if (hasReceiptIds || hasSubIds || hasImportHashes) {
             // Get existing hashes from database
             const existingHashes = await Database.getExistingHashes();
             const dedupedData = [];
@@ -323,6 +329,10 @@ const ImportExport = {
                     const hashInput = record.receiptId + '|' + (record.recurrenceNumber || '1');
                     hash = await Utils.sha256(hashInput);
                     record.importHash = hash;
+                } else if (record.subId) {
+                    // FEC export: generate hash from sub_id
+                    hash = await Utils.sha256(record.subId);
+                    record.importHash = hash;
                 }
 
                 // Check if hash already exists
@@ -334,6 +344,7 @@ const ImportExport = {
                 // Clean up temporary fields
                 delete record.receiptId;
                 delete record.recurrenceNumber;
+                delete record.subId;
 
                 dedupedData.push(record);
                 if (hash) existingHashes.add(hash); // Track for this import session
@@ -349,6 +360,7 @@ const ImportExport = {
             parsedData.forEach(r => {
                 delete r.receiptId;
                 delete r.recurrenceNumber;
+                delete r.subId;
             });
         }
 
