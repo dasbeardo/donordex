@@ -10,20 +10,22 @@ const ImportExport = {
     savedColumnMapping: null,
 
     // Column detection patterns for FEC CSV formats
+    // NOTE: Order matters - more specific patterns first!
     COLUMN_PATTERNS: {
-        // ActBlue-specific columns
-        firstName: ['donor first name', 'contributor_first_name', 'first_name', 'firstname', 'first', 'contrib_first_name'],
-        lastName: ['donor last name', 'contributor_last_name', 'last_name', 'lastname', 'last', 'contrib_last_name'],
-        fullName: ['contributor_name', 'donor_name', 'name', 'individual_name', 'person_name', 'contributor', 'donor'],
-        committee: ['recipient', 'committee_name', 'recipient_name', 'committee', 'candidate_name', 'payee_name', 'committee_id', 'cmte_id'],
-        date: ['date', 'contribution_receipt_date', 'transaction_date', 'receipt_date', 'transaction_dt', 'contrib_date'],
-        amount: ['amount', 'contribution_receipt_amount', 'transaction_amount', 'receipt_amount', 'total', 'transaction_amt', 'contrib_amount'],
+        // Name columns
+        firstName: ['contributor_first_name', 'donor first name', 'first_name', 'firstname', 'first', 'contrib_first_name'],
+        lastName: ['contributor_last_name', 'donor last name', 'last_name', 'lastname', 'last', 'contrib_last_name'],
+        fullName: ['contributor_name', 'donor_name', 'individual_name', 'person_name'],
+        // Committee - most specific first, avoid matching committee_id or committee_type
+        committee: ['committee_name', 'recipient_name', 'recipient', 'candidate_name', 'payee_name'],
+        date: ['contribution_receipt_date', 'transaction_date', 'receipt_date', 'transaction_dt', 'contrib_date', 'date'],
+        amount: ['contribution_receipt_amount', 'transaction_amount', 'receipt_amount', 'transaction_amt', 'contrib_amount', 'amount', 'total'],
         entity: ['entity_type', 'entity_tp', 'entity_t', 'entity'],
         tranId: ['transaction_id', 'tran_id', 'sub_id', 'transaction_number'],
-        employer: ['donor employer', 'contributor_employer', 'employer', 'contrib_employer'],
-        occupation: ['donor occupation', 'contributor_occupation', 'occupation', 'contrib_occupation'],
-        city: ['donor city', 'contributor_city', 'city', 'contrib_city'],
-        state: ['donor state', 'contributor_state', 'state', 'contrib_state', 'contributor_st'],
+        employer: ['contributor_employer', 'donor employer', 'employer', 'contrib_employer'],
+        occupation: ['contributor_occupation', 'donor occupation', 'occupation', 'contrib_occupation'],
+        city: ['contributor_city', 'donor city', 'city', 'contrib_city'],
+        state: ['contributor_state', 'donor state', 'state', 'contrib_state', 'contributor_st'],
         // ActBlue Receipt ID for deduplication
         receiptId: ['receipt id', 'receipt_id', 'receiptid'],
         recurrenceNumber: ['recurrence number', 'recurrence_number', 'recurrencenumber'],
@@ -33,16 +35,26 @@ const ImportExport = {
 
     /**
      * Find column index by matching against pattern candidates
+     * Prioritizes exact matches over partial matches
      * @param {Array<string>} headers - Column headers
      * @param {Array<string>} candidates - Pattern candidates to match
      * @returns {number} - Column index or -1 if not found
      */
     findColumnIdx(headers, candidates) {
         const H = headers.map(h => h.toLowerCase().trim());
+
+        // First pass: exact matches only
         for (const c of candidates) {
-            const idx = H.findIndex(h => h === c || h.includes(c) || c.includes(h));
+            const idx = H.findIndex(h => h === c);
             if (idx !== -1) return idx;
         }
+
+        // Second pass: partial matches (contains)
+        for (const c of candidates) {
+            const idx = H.findIndex(h => h.includes(c) || c.includes(h));
+            if (idx !== -1) return idx;
+        }
+
         return -1;
     },
 

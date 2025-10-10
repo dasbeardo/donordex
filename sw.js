@@ -3,8 +3,8 @@
  * Provides offline support and caching for PWA functionality
  */
 
-const CACHE_NAME = 'donordex-v7';
-const RUNTIME_CACHE = 'donordex-runtime-v7';
+const CACHE_NAME = 'donordex-v9';
+const RUNTIME_CACHE = 'donordex-runtime-v9';
 
 // Files to cache on install
 const STATIC_ASSETS = [
