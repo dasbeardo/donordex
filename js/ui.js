@@ -52,11 +52,151 @@ const UI = {
     },
 
     /**
+     * Open Committee Manager modal
+     */
+    async openCommitteeManager() {
+        document.getElementById('committeeManagerModal').style.display = 'block';
+        document.getElementById('modalBackdrop').style.display = 'block';
+        await this.loadCommitteeList();
+
+        // Setup search box listener
+        const searchBox = document.getElementById('committeeSearchBox');
+        searchBox.value = '';
+        searchBox.oninput = () => this.filterCommitteeList();
+    },
+
+    /**
+     * Close Committee Manager modal
+     */
+    closeCommitteeManager() {
+        document.getElementById('committeeManagerModal').style.display = 'none';
+        document.getElementById('modalBackdrop').style.display = 'none';
+    },
+
+    /**
+     * Load and display committee list with labels
+     */
+    async loadCommitteeList() {
+        const committees = await Database.getUniqueCommittees();
+        const labels = await Database.getAllCommitteeLabels();
+        const labelMap = new Map(labels.map(l => [l.committeeName, l.label]));
+
+        this.committeeData = committees.map(name => ({
+            name: name,
+            label: labelMap.get(name) || null
+        }));
+
+        this.renderCommitteeList(this.committeeData);
+    },
+
+    /**
+     * Render committee list
+     * @param {Array} committees - Array of {name, label} objects
+     */
+    renderCommitteeList(committees) {
+        const container = document.getElementById('committeeList');
+
+        if (committees.length === 0) {
+            container.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096;">No committees found</div>';
+            return;
+        }
+
+        let html = '';
+        committees.forEach(committee => {
+            const isTeam = committee.label === 'team';
+            const isOpp = committee.label === 'opposition';
+
+            html += `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #e2e8f0; gap: 15px;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; color: #2c3e50; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            ${Utils.escapeHtml(committee.name)}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                        <button
+                            onclick="UI.setLabel('${Utils.escapeHtml(committee.name).replace(/'/g, "\\'")}', 'team')"
+                            style="padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 2px solid; ${isTeam ? 'background: #2563eb; color: white; border-color: #2563eb;' : 'background: white; color: #2563eb; border-color: #2563eb;'}"
+                            onmouseover="if(!this.style.background.includes('2563eb')) { this.style.background='#eff6ff'; }"
+                            onmouseout="if(!this.style.background.includes('2563eb')) { this.style.background='white'; }"
+                        >
+                            ${isTeam ? '✓ ' : ''}Team
+                        </button>
+                        <button
+                            onclick="UI.setLabel('${Utils.escapeHtml(committee.name).replace(/'/g, "\\'")}', null)"
+                            style="padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 2px solid; ${!isTeam && !isOpp ? 'background: #6b7280; color: white; border-color: #6b7280;' : 'background: white; color: #6b7280; border-color: #6b7280;'}"
+                            onmouseover="if(!this.style.background.includes('6b7280')) { this.style.background='#f3f4f6'; }"
+                            onmouseout="if(!this.style.background.includes('6b7280')) { this.style.background='white'; }"
+                        >
+                            ${!isTeam && !isOpp ? '✓ ' : ''}None
+                        </button>
+                        <button
+                            onclick="UI.setLabel('${Utils.escapeHtml(committee.name).replace(/'/g, "\\'")}', 'opposition')"
+                            style="padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 2px solid; ${isOpp ? 'background: #dc2626; color: white; border-color: #dc2626;' : 'background: white; color: #dc2626; border-color: #dc2626;'}"
+                            onmouseover="if(!this.style.background.includes('dc2626')) { this.style.background='#fef2f2'; }"
+                            onmouseout="if(!this.style.background.includes('dc2626')) { this.style.background='white'; }"
+                        >
+                            ${isOpp ? '✓ ' : ''}Opp
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    },
+
+    /**
+     * Filter committee list based on search input
+     */
+    filterCommitteeList() {
+        const searchTerm = document.getElementById('committeeSearchBox').value.toLowerCase().trim();
+
+        if (!searchTerm) {
+            this.renderCommitteeList(this.committeeData);
+            return;
+        }
+
+        const filtered = this.committeeData.filter(c =>
+            c.name.toLowerCase().includes(searchTerm)
+        );
+        this.renderCommitteeList(filtered);
+    },
+
+    /**
+     * Set label for a committee
+     * @param {string} committeeName - Committee name
+     * @param {string|null} label - Label ("team", "opposition", or null to remove)
+     */
+    async setLabel(committeeName, label) {
+        try {
+            if (label === null) {
+                await Database.removeCommitteeLabel(committeeName);
+            } else {
+                await Database.setCommitteeLabel(committeeName, label);
+            }
+
+            // Update local data
+            const committee = this.committeeData.find(c => c.name === committeeName);
+            if (committee) {
+                committee.label = label;
+            }
+
+            // Re-render the list to show updated button states
+            this.filterCommitteeList();
+        } catch (error) {
+            console.error('Error setting label:', error);
+            alert('Error setting label. Please try again.');
+        }
+    },
+
+    /**
      * Close all open modals
      */
     closeAllModals() {
         this.closeAddModal();
         this.closeImportExportModal();
+        this.closeCommitteeManager();
     },
 
     /**

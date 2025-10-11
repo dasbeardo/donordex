@@ -569,7 +569,8 @@ const ImportExport = {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'donordex-export.csv';
+        const timestamp = Utils.getTimestamp();
+        a.download = `donordex-export-${timestamp}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
     },

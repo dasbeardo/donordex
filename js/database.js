@@ -16,6 +16,12 @@ db.version(2).stores({
     contributions: '&id, lastName, candidateName, contributionDate, contributionEpoch, amount, state, employer, occupation, entityType, importHash'
 });
 
+// Schema v3: Add committeeLabels for team/opposition tagging
+db.version(3).stores({
+    contributions: '&id, lastName, candidateName, contributionDate, contributionEpoch, amount, state, employer, occupation, entityType, importHash',
+    committeeLabels: '&committeeName, label'
+});
+
 /**
  * Database operations
  */
@@ -196,6 +202,74 @@ const Database = {
             if (r.importHash) hashes.add(r.importHash);
         });
         return hashes;
+    },
+
+    // ==================== Committee Label Management ====================
+
+    /**
+     * Set label for a committee (team or opposition)
+     * @param {string} committeeName - Committee name to label
+     * @param {string} label - Label: "team" or "opposition"
+     * @returns {Promise<string>} - Committee name
+     */
+    async setCommitteeLabel(committeeName, label) {
+        if (!committeeName) throw new Error('Committee name required');
+        if (!['team', 'opposition'].includes(label)) throw new Error('Label must be "team" or "opposition"');
+
+        return await db.committeeLabels.put({
+            committeeName: committeeName,
+            label: label
+        });
+    },
+
+    /**
+     * Remove label from a committee
+     * @param {string} committeeName - Committee name
+     * @returns {Promise<void>}
+     */
+    async removeCommitteeLabel(committeeName) {
+        return await db.committeeLabels.delete(committeeName);
+    },
+
+    /**
+     * Get label for a specific committee
+     * @param {string} committeeName - Committee name
+     * @returns {Promise<string|null>} - Label ("team", "opposition") or null
+     */
+    async getCommitteeLabel(committeeName) {
+        const record = await db.committeeLabels.get(committeeName);
+        return record ? record.label : null;
+    },
+
+    /**
+     * Get all committee labels
+     * @returns {Promise<Array>} - Array of {committeeName, label} objects
+     */
+    async getAllCommitteeLabels() {
+        return await db.committeeLabels.toArray();
+    },
+
+    /**
+     * Get all committees with a specific label
+     * @param {string} label - Label to filter by ("team" or "opposition")
+     * @returns {Promise<Array<string>>} - Array of committee names
+     */
+    async getCommitteesByLabel(label) {
+        const records = await db.committeeLabels.where('label').equals(label).toArray();
+        return records.map(r => r.committeeName);
+    },
+
+    /**
+     * Get all unique committee names from contributions
+     * @returns {Promise<Array<string>>} - Sorted array of committee names
+     */
+    async getUniqueCommittees() {
+        const records = await db.contributions.toArray();
+        const committees = new Set();
+        records.forEach(r => {
+            if (r.candidateName) committees.add(r.candidateName);
+        });
+        return Array.from(committees).sort();
     }
 };
 

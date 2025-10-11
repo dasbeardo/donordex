@@ -205,7 +205,8 @@ const Filters = {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'donordex-filtered.csv';
+        const timestamp = Utils.getTimestamp();
+        a.download = `donordex-filtered-${timestamp}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
     },

@@ -57,19 +57,44 @@ const Search = {
 
     /**
      * Search donors with fuzzy matching and display results
+     * Supports wildcards: @team and @opp for filtering by committee label
      * Uses 150ms debounce
      */
     async searchDonors() {
-        const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+        const rawInput = document.getElementById('searchInput').value.trim();
         const resultsContainer = document.getElementById('resultsContainer');
 
-        if (!searchTerm) {
+        if (!rawInput) {
             resultsContainer.innerHTML = '<div class="no-results">Enter a donor name to begin search</div>';
+            return;
+        }
+
+        // Parse wildcard filter
+        let labelFilter = null;
+        let searchTerm = rawInput.toLowerCase();
+
+        if (searchTerm.startsWith('@team ') || searchTerm === '@team') {
+            labelFilter = 'team';
+            searchTerm = searchTerm.replace(/^@team\s*/, '').trim();
+        } else if (searchTerm.startsWith('@opp ') || searchTerm === '@opp') {
+            labelFilter = 'opposition';
+            searchTerm = searchTerm.replace(/^@opp\s*/, '').trim();
+        }
+
+        // If only wildcard with no search term, show all contributions for that label
+        if (labelFilter && !searchTerm) {
+            resultsContainer.innerHTML = `<div class="no-results">Enter a donor name after <code>@${labelFilter === 'team' ? 'team' : 'opp'}</code><br><small style="margin-top: 10px; display: block;">Example: @${labelFilter === 'team' ? 'team' : 'opp'} john smith</small></div>`;
             return;
         }
 
         // Get all records from database
         const allRecords = await Database.getRecordsForSearch();
+
+        // If label filter is active, get committees with that label
+        let labeledCommittees = null;
+        if (labelFilter) {
+            labeledCommittees = new Set(await Database.getCommitteesByLabel(labelFilter));
+        }
 
         // Apply fuzzy matching
         const results = allRecords.map(record => {
@@ -80,7 +105,12 @@ const Search = {
                 matchType: matchResult.match ? matchResult.type : 'none',
                 isMatch: matchResult.match
             };
-        }).filter(r => r.isMatch);
+        }).filter(r => {
+            // Filter by name match AND committee label (if applicable)
+            if (!r.isMatch) return false;
+            if (labelFilter && !labeledCommittees.has(r.candidateName)) return false;
+            return true;
+        });
 
         // Sort by match type (exact first) then score
         results.sort((a, b) => {
@@ -90,7 +120,12 @@ const Search = {
         });
 
         if (results.length === 0) {
-            resultsContainer.innerHTML = '<div class="no-results">No donors found in DonorDex<br><small style="margin-top: 10px; display: block;">Try adjusting your search term</small></div>';
+            let message = 'No donors found in DonorDex';
+            if (labelFilter) {
+                const labelText = labelFilter === 'team' ? 'team committees' : 'opposition committees';
+                message += ` (${labelText} only)`;
+            }
+            resultsContainer.innerHTML = `<div class="no-results">${message}<br><small style="margin-top: 10px; display: block;">Try adjusting your search term</small></div>`;
             return;
         }
 
@@ -109,16 +144,21 @@ const Search = {
         });
 
         // Render results
-        this.renderSearchResults(groupedResults, resultsContainer);
+        await this.renderSearchResults(groupedResults, resultsContainer, labelFilter);
     },
 
     /**
      * Render search results to DOM
      * @param {Object} groupedResults - Results grouped by donor name
      * @param {HTMLElement} container - Container element
+     * @param {string|null} labelFilter - Active label filter (for messaging)
      */
-    renderSearchResults(groupedResults, container) {
+    async renderSearchResults(groupedResults, container, labelFilter = null) {
         container.innerHTML = '';
+
+        // Load committee labels for badges
+        const allLabels = await Database.getAllCommitteeLabels();
+        const labelMap = new Map(allLabels.map(l => [l.committeeName, l.label]));
 
         Object.keys(groupedResults).forEach(fullName => {
             const group = groupedResults[fullName];
@@ -170,13 +210,21 @@ const Search = {
 
             donations.forEach((record, index) => {
                 const isRefund = record.isRefund || record.amount < 0;
+                const committeeLabel = labelMap.get(record.candidateName);
+                let labelBadge = '';
+                if (committeeLabel === 'team') {
+                    labelBadge = ' <span style="display: inline-block; padding: 2px 8px; background: #2563eb; color: white; border-radius: 4px; font-size: 10px; font-weight: 700; vertical-align: middle; margin-left: 6px;">TEAM</span>';
+                } else if (committeeLabel === 'opposition') {
+                    labelBadge = ' <span style="display: inline-block; padding: 2px 8px; background: #dc2626; color: white; border-radius: 4px; font-size: 10px; font-weight: 700; vertical-align: middle; margin-left: 6px;">OPP</span>';
+                }
+
                 html += `
                 <div class="contribution-item">
                     <div style="font-size: 11px; color: #a0aec0; margin-bottom: 8px; font-weight: 600;">CONTRIBUTION #${index + 1}${isRefund ? ' <span class="refund-badge">REFUND</span>' : ''}</div>
                     <div class="donation-info">
                         <div class="info-item">
                             <div class="info-label">Committee</div>
-                            <div class="info-value">${Utils.escapeHtml(record.candidateName)}</div>
+                            <div class="info-value">${Utils.escapeHtml(record.candidateName)}${labelBadge}</div>
                         </div>
                         <div class="info-item">
                             <div class="info-label">Date</div>

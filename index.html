@@ -326,6 +326,28 @@
             </div>
         </div>
 
+        <!-- Committee Manager Modal -->
+        <div id="committeeManagerModal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 2000; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <h2 style="margin-bottom: 10px; color: #174A57;">🏛️ Manage Committees</h2>
+            <p style="font-size: 13px; color: #718096; margin-bottom: 20px;">
+                Label committees as <strong style="color: #2563eb;">Team</strong> or <strong style="color: #dc2626;">Opposition</strong> to filter search results with <code>@team</code> or <code>@opp</code> wildcards.
+            </p>
+
+            <!-- Search box for filtering committees -->
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="committeeSearchBox" placeholder="Search committees..." style="width: 100%; padding: 12px; border: 2px solid #cbd5e0; border-radius: 8px; font-size: 14px;">
+            </div>
+
+            <!-- Committee list -->
+            <div id="committeeList" style="max-height: 400px; overflow-y: auto; border: 2px solid #e2e8f0; border-radius: 8px; padding: 10px;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <div class="button-group" style="margin-top: 20px; border-top: 2px solid #e2e8f0; padding-top: 20px;">
+                <button class="btn btn-secondary" onclick="UI.closeCommitteeManager()">Close</button>
+            </div>
+        </div>
+
         <!-- Modal Backdrop -->
         <div id="modalBackdrop" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1999;" onclick="UI.closeAllModals()"></div>
 
@@ -339,6 +361,10 @@
                 <div onclick="UI.openImportExportModal(); UI.closeFabMenu();" style="padding: 12px 20px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
                     <span style="font-size: 18px;">📁</span>
                     <span style="font-weight: 600; color: #174A57;">Import/Export</span>
+                </div>
+                <div onclick="UI.openCommitteeManager(); UI.closeFabMenu();" style="padding: 12px 20px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
+                    <span style="font-size: 18px;">🏛️</span>
+                    <span style="font-weight: 600; color: #174A57;">Manage Committees</span>
                 </div>
                 <div onclick="App.clearAllData(); UI.closeFabMenu();" style="padding: 12px 20px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px;" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
                     <span style="font-size: 18px;">🗑️</span>
